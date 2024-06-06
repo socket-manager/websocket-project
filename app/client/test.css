@@ -1,0 +1,43 @@
+@charset "utf-8";
+
+body {
+    background-color: #fffff0;
+    color: #000333;
+    margin: auto;
+}
+
+/* URI入力欄 */
+div.uri-div {
+    margin: 10px;
+    display: flex;
+    flex-direction: row;
+}
+
+/* 接続先アドレス入力欄 */
+input.uri {
+    display: block;
+    height: 30px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    text-indent: .5em;
+    box-shadow: none;
+    width: 200px;
+    font-size: 14px;
+}
+
+/* 接続ボタン */
+#connect_button {
+    margin-left: 10px;
+    border: 2px solid #f07e1a;
+    border-radius: 3px;
+    color: #fff;
+    background: #f07e1a;
+    font-weight: bold;
+    font-size: medium;
+}
+#connect_button:active {
+    color: #fff;
+    background: #a14f06;
+}
