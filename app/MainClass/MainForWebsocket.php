@@ -44,17 +44,22 @@ class MainForWebsocket extends Console
     protected string $description = 'Websocketサーバー';
 
     /**
-     * ホスト名（リッスン用）
+     * @var string $host ホスト名（リッスン用）
      */
-    private ?string $host = 'localhost';
+    private string $host = 'localhost';
 
     /**
-     * 周期インターバル時間（μs）
+     * @var int $port ポート番号（リッスン用）
+     */
+    private int $port = 10000;
+
+    /**
+     * @var int $cycle_interval 周期インターバル時間（μs）
      */
     private int $cycle_interval = 1000;
 
     /**
-     * アライブチェックタイムアウト時間（μs）
+     * @var int $alive_interval アライブチェックタイムアウト時間（μs）
      */
     private int $alive_interval = 3600;
 
@@ -69,21 +74,45 @@ class MainForWebsocket extends Console
      */
     public function exec()
     {
-        // 引数の取得
-        $port_no = $this->getParameter('port_no');
+        //--------------------------------------------------------------------------
+        // 設定値の反映
+        //--------------------------------------------------------------------------
+
+        // ホスト名の設定
+        $this->host = config('const.host');
+
+        // ポート番号の設定
+        $this->port = config('const.port');
+
+        // 周期インターバルの設定
+        $this->cycle_interval = config('const.cycle_interval');
+
+        // アライブチェックタイムアウト時間の設定
+        $this->alive_interval = config('const.alive_interval');
 
         //--------------------------------------------------------------------------
-        // 初期化
+        // 引数の反映
+        //--------------------------------------------------------------------------
+
+        // 引数の取得
+        $port = $this->getParameter('port_no');
+        if($port !== null)
+        {
+            $this->port = $port;
+        }
+
+        //--------------------------------------------------------------------------
+        // SocketManagerの初期化
         //--------------------------------------------------------------------------
 
         // ソケットマネージャーのインスタンス設定
-        $manager = new SocketManager($this->host, $port_no);
+        $manager = new SocketManager($this->host, $this->port);
 
         // UNITパラメータインスタンスの設定
         $param = new ParameterForWebsocket();
 
         // SocketManagerの設定値初期設定
-        $init = new InitForWebsocket($param, $port_no);
+        $init = new InitForWebsocket($param, $this->port);
         $manager->setInitSocketManager($init);
 
         // プロトコルUNITの設定
