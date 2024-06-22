@@ -8,9 +8,9 @@ return [
     'host' => 'localhost',
 
     /**
-     * @var int ポート番号（UDPマルチサーバーの親ポートと兼用）
+     * @var int ポート番号
      */
-    'port' => 20000,
+    'port' => 10000,
 
     /**
      * @var int 周期インターバル時間（μs）
