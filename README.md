@@ -6,7 +6,7 @@ Websocketサーバーの開発環境です。<br />
 プロジェクトルートディレクトリで以下のコマンドを実行すればサーバーを起動できます。
 
 <pre>
-> php worker app:websocket-server <ポート番号>
+> php worker app:websocket-server [<ポート番号>]
 </pre>
 
 ## クライアントの起動
