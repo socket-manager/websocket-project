@@ -1,25 +1,47 @@
-# WEBSOCKET-PROJECT on SOCKET-MANAGER Framework
-Websocketサーバーの開発環境です。<br />
-プロトコルは実装済みなのでコマンド処理を追加するだけで使えます。
+# WEBSOCKET-PROJECT — WebSocketサーバー開発環境
+WEBSOCKET-PROJECT は SOCKET-MANAGER フレームワーク用の軽量な WebSocket サーバー開発テンプレートです。
+PHP で動作する WebSocket サーバーの起動・検証用クライアントを含み、Laravel との連携も可能です。
 
-## サーバーの起動
-プロジェクトルートディレクトリで以下のコマンドを実行すればサーバーを起動できます。
+## 概要
+- プロトコル実装済みなので、コマンド（ビジネスロジック）処理を追加するだけですぐに使えます。
+- 開発用の軽量クライアント（/app/client/test.html）で動作検証が可能です。
+- Laravel と連携できます（ドキュメントあり）。
 
-<pre>
-> php worker app:websocket-server [<ポート番号>]
-</pre>
+## 特長
+- すぐに使える WebSocket サーバー実装（プロトコル対応済み）
+- 最小限のテスト用クライアントを同梱（ブラウザで簡単に動作確認）
+- Laravel とシームレスに連携可能
 
-## クライアントの起動
-以下のディレクトリにHTMLファイルが入っています（検証用なので最小限のロジックしか入っていません）。<br />
-そのファイルをブラウザにドラッグ＆ドロップしてください（Webサーバーを起動する必要はありません）。
+## クイックスタート（Quick Start）
+1. プロジェクトルートで以下のコマンドを実行して WebSocket サーバーを起動します。
 
+```bash
+php worker app:websocket-server [<ポート番号>]
+```
+
+- ポート番号を省略するとデフォルトポートが使用されます。
+- 例: `php worker app:websocket-server 8080`
+
+2. サーバーが起動したら、同梱のテストクライアントで接続を確認します（次節参照）。
+
+## クライアントでの動作検証
+- 検証用の最小限の HTML クライアントは次のパスにあります（ブラウザにドラッグ＆ドロップして開くだけで動作します。Web サーバーを起動する必要はありません）。
+
+```code
 /app/client/test.html
+```
 
-## 補足
-プロジェクトの詳しい使い方は<a href="https://socket-manager.github.io/document/websocket.html">こちら</a>をご覧ください。
+- テストクライアントは簡易的な送受信ロジックのみ含むため、実運用では独自クライアント実装を推奨します。
 
-このプロジェクトはLaravelと連携できます。<br />
-詳しい連携方法は<a href="https://socket-manager.github.io/document/laravel.html">こちら</a>をご覧ください。
+## Laravel との連携
+このプロジェクトは Laravel と連携して使えます。具体的な連携方法や設定手順は以下のドキュメントをご参照ください。
+
+https://socket-manager.github.io/document/laravel.html
+
+## ドキュメント
+より詳しい使い方や設計方針は以下の公式ドキュメントに記載しています。
+
+https://socket-manager.github.io/document/websocket.html
 
 ## Contact Us
 バグ報告やご要望などは<a href="mailto:lib.tech.engineer@gmail.com">`こちら`</a>から受け付けております。
