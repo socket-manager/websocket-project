@@ -2,6 +2,9 @@
     "name": "socket-manager/websocket-project",
     "description": "WEBSOCKET-PROJECT: Websocketサーバー開発環境プロジェクト",
     "type": "project",
+    "support": {
+        "docs": "https://socket-manager.github.io/document/websocket.html"
+    },
     "license": "MIT",
     "keywords": [
         "php",
