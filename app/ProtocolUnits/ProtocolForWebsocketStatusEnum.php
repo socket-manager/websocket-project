@@ -47,6 +47,16 @@ enum ProtocolForWebsocketStatusEnum: string
      */
     case PAYLOAD = 'payload';
 
+    /**
+     * @var string PONGフレーム生成のステータス名
+     */
+    case PONG_CREATE = 'pong_create';
+
+    /**
+     * @var string PONG送信中のステータス名
+     */
+    case PONG_SENDING = 'pong_sending';
+
 
     //--------------------------------------------------------------------------
     // 定数（ProtocolQueueEnum::ACCEPTキュー）

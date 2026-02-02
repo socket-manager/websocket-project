@@ -7,7 +7,6 @@
 
 namespace App\ProtocolUnits;
 
-use SocketManager\Library\IEntryUnits;
 use SocketManager\Library\ProtocolQueueEnum;
 use SocketManager\Library\UnitException;
 use SocketManager\Library\UnitExceptionEnum;
@@ -17,9 +16,9 @@ use App\UnitParameter\ParameterForWebsocket;
 /**
  * プロトコルUNIT登録クラス
  * 
- * IEntryUnitsインタフェースをインプリメントする
+ * ProtocolForWebsocketインタフェースをインプリメントする
  */
-class ProtocolForWebsocket implements IEntryUnits
+class ProtocolForWebsocketClient extends ProtocolForWebsocket
 {
     //--------------------------------------------------------------------------
     // 定数
@@ -29,7 +28,7 @@ class ProtocolForWebsocket implements IEntryUnits
      * @var const QUEUE_LIST キュー名のリスト
      */
     protected const QUEUE_LIST = [
-        ProtocolQueueEnum::ACCEPT->value,	// アクセプトを処理するキュー
+        ProtocolQueueEnum::CONNECT->value,  // コネクションキュー
         ProtocolQueueEnum::RECV->value,		// 受信処理のキュー
         ProtocolQueueEnum::SEND->value,		// 送信処理のキュー
         ProtocolQueueEnum::CLOSE->value,	// 切断処理のキュー
@@ -74,19 +73,19 @@ class ProtocolForWebsocket implements IEntryUnits
     {
         $ret = [];
 
-        if($p_que === ProtocolQueueEnum::ACCEPT->value)
+        if($p_que === ProtocolQueueEnum::CONNECT->value)
         {
             $ret[] = [
                 'status' => ProtocolForWebsocketStatusEnum::START->value,
-                'unit' => $this->getAcceptStart()
-            ];
-            $ret[] = [
-                'status' => ProtocolForWebsocketStatusEnum::CREATE->value,
-                'unit' => $this->getAcceptCreate()
+                'unit' => $this->getConnectStart()
             ];
             $ret[] = [
                 'status' => ProtocolForWebsocketStatusEnum::SEND->value,
-                'unit' => $this->getAcceptSend()
+                'unit' => $this->getConnectSend()
+            ];
+            $ret[] = [
+                'status' => ProtocolForWebsocketStatusEnum::RECV->value,
+                'unit' => $this->getConnectRecv()
             ];
         }
         else
@@ -99,10 +98,6 @@ class ProtocolForWebsocket implements IEntryUnits
             $ret[] = [
                 'status' => ProtocolForWebsocketStatusEnum::LENGTH->value,
                 'unit' => $this->getRecvLength()
-            ];
-            $ret[] = [
-                'status' => ProtocolForWebsocketStatusEnum::MASK->value,
-                'unit' => $this->getRecvMask()
             ];
             $ret[] = [
                 'status' => ProtocolForWebsocketStatusEnum::PAYLOAD->value,
@@ -161,10 +156,6 @@ class ProtocolForWebsocket implements IEntryUnits
                 'unit' => $this->getRecvLength()
             ];
             $ret[] = [
-                'status' => ProtocolForWebsocketStatusEnum::MASK->value,
-                'unit' => $this->getRecvMask()
-            ];
-            $ret[] = [
                 'status' => ProtocolForWebsocketStatusEnum::PAYLOAD->value,
                 'unit' => $this->getRecvPayload()
             ];
@@ -181,19 +172,79 @@ class ProtocolForWebsocket implements IEntryUnits
         return $ret;
     }
 
+
     //--------------------------------------------------------------------------
-    // 以降はステータスUNITの定義（"ACCEPT"キュー）
+    // 以降はステータスUNITの定義（"CONNECT"キュー）
     //--------------------------------------------------------------------------
 
     /**
      * ステータス名： START
      * 
-     * 処理名：受信
+     * 処理名：データ作成（ハンドシェイク用）
      * 
      * @param ParameterForWebsocket $p_param UNITパラメータ
      * @return ?string 遷移先のステータス名
      */
-    protected function getAcceptStart()
+    protected function getConnectStart()
+    {
+        return function(ParameterForWebsocket $p_param): ?string
+        {
+            // ハンドシェイクデータの生成
+            $host = '';
+            $port = 0;
+            $p_param->getSockName($host, $port);
+            $ver = ParameterForWebsocket::CHAT_PROTOCOL_VERSION;
+            $key = base64_encode(random_bytes(16));
+            $hdrs  =
+                "GET / HTTP/1.1\r\n" .
+                "Host: {$host}:{$port}\r\n" .
+                "Connection: Upgrade\r\n" .
+                "Upgrade: websocket\r\n" .
+                "Sec-WebSocket-Version: {$ver}\r\n" .
+                "Sec-WebSocket-Key: {$key}\r\n\r\n";
+
+            // 送信データの設定
+            $p_param->protocol()->setSendingData($hdrs);
+    
+            return ProtocolForWebsocketStatusEnum::SEND->value;
+        };
+    }
+
+    /**
+     * ステータス名： SEND
+     * 
+     * 処理名：ハンドシェイクデータ送信
+     * 
+     * @param ParameterForWebsocket $p_param UNITパラメータ
+     * @return ?string 遷移先のステータス名
+     */
+    protected function getConnectSend()
+    {
+        return function(ParameterForWebsocket $p_param): ?string
+        {
+            // データ送信
+            $w_ret = $p_param->protocol()->sending();
+
+            // 送信中の場合は再実行
+            if($w_ret === null)
+            {
+                $sta = $p_param->getStatusName();
+                return $sta;
+            }
+
+            return ProtocolForWebsocketStatusEnum::RECV->value;
+        };
+    }
+
+    /**
+     * ステータス名： RECV
+     * 
+     * 処理名：レスポンス受信
+     * 
+     * @param ParameterForWebsocket $p_param UNITパラメータ
+     * @return ?string 遷移先のステータス名
+     */
+    protected function getConnectRecv()
     {
         return function(ParameterForWebsocket $p_param): ?string
         {
@@ -243,10 +294,7 @@ class ProtocolForWebsocket implements IEntryUnits
     
                     // ヘッダ情報を格納
                     $p_param->setHeaders($hdrs);
-
-                    $w_ret = $p_param->getHeaders();
-
-                    return ProtocolForWebsocketStatusEnum::CREATE->value;
+                    return null;
                 }
     
                 // 受信中のデータを格納
@@ -257,157 +305,6 @@ class ProtocolForWebsocket implements IEntryUnits
             $sta = $p_param->getStatusName();
     
             return $sta;
-        };
-    }
-
-    /**
-     * ステータス名： CREATE
-     * 
-     * 処理名：データ作成（返信用）
-     * 
-     * @param ParameterForWebsocket $p_param UNITパラメータ
-     * @return ?string 遷移先のステータス名
-     */
-    protected function getAcceptCreate()
-    {
-        return function(ParameterForWebsocket $p_param): ?string
-        {
-            // ハンドシェイクデータの取得
-            $hdrs = $p_param->getHeaders();
-
-            // リッスンホスト名を取得
-            $host = $p_param->getAwaitHost();
-            $port = $p_param->getAwaitPort();
-
-            // アクセプトキーの生成
-            $sec_key = $hdrs['Sec-WebSocket-Key'];
-            $sec_accept = base64_encode(pack('H*', sha1($sec_key . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')));
-    
-            // ロケーションURLの設定
-            $tls = $p_param->getTls();
-            $protocol = 'ws';
-            if($tls === true)
-            {
-                $protocol = 'wss';
-            }
-            $location = "{$protocol}://{$host}:{$port}";
-    
-            // プロトコルバージョンのチェック
-            $ok = false;
-            $res = '';
-            if(isset($hdrs['Sec-WebSocket-Version']))
-            {
-                $ver = trim($hdrs['Sec-WebSocket-Version']);
-                if($ver == ParameterForWebsocket::CHAT_PROTOCOL_VERSION)
-                {
-                    $ok = true;
-                }
-                else
-                {
-                    // 返信用ハンドシェイクデータの作成
-                    $res  =
-                        "HTTP/1.1 400 Bad Request\r\n" .
-                        "WebSocket-Origin: {$host}\r\n" .
-                        "WebSocket-Location: {$location}/\r\n" .
-                        "Sec-WebSocket-Accept: {$sec_accept}\r\n" .
-                        "Sec-WebSocket-Version: ".ParameterForWebsocket::CHAT_PROTOCOL_VERSION."\r\n\r\n";
-                }
-            }
-            else
-            {
-                // 返信用ハンドシェイクデータの作成
-                $res  = "HTTP/1.1 400 Bad Request\r\n\r\n";
-            }
-
-            if($ok === false)
-            {
-                // 送信データの設定
-                $p_param->protocol()->setSendingData($res);
-    
-                // NGを設定
-                $hdrs['result'] = false;
-                $p_param->setHeaders($hdrs);
-
-                return ProtocolForWebsocketStatusEnum::SEND->value;
-            }
-
-            // 返信用ハンドシェイクデータの作成
-            $upgrade  =
-                "HTTP/1.1 101 Web Socket Protocol Handshake\r\n" .
-                "Upgrade: websocket\r\n" .
-                "Connection: Upgrade\r\n" .
-                "WebSocket-Origin: {$host}\r\n" .
-                "WebSocket-Location: {$location}/\r\n" .
-                "Sec-WebSocket-Accept: {$sec_accept}\r\n\r\n";
-    
-            // 送信データの設定
-            $p_param->protocol()->setSendingData($upgrade);
-    
-            // OKを設定
-            $hdrs['result'] = true;
-            $p_param->setHeaders($hdrs);
-
-            return ProtocolForWebsocketStatusEnum::SEND->value;
-        };
-    }
-
-    /**
-     * ステータス名： SEND
-     * 
-     * 処理名：返信データ送信
-     * 
-     * @param ParameterForWebsocket $p_param UNITパラメータ
-     * @return ?string 遷移先のステータス名
-     */
-    protected function getAcceptSend()
-    {
-        return function(ParameterForWebsocket $p_param): ?string
-        {
-            // データ送信
-            $w_ret = $p_param->protocol()->sending();
-
-            // 送信中の場合は再実行
-            if($w_ret === null)
-            {
-                $sta = $p_param->getStatusName();
-                return $sta;
-            }
-
-            // NG判定
-            $hdrs = $p_param->getHeaders();
-            if($hdrs['result'] === false)
-            {
-                // リトライカウンター設定
-                if(!isset($hdrs['retry']))
-                {
-                    $hdrs['retry'] = 1;
-                }
-                else
-                {
-                    $hdrs['retry']++;
-                }
-
-                // リトライカウント判定
-                if($hdrs['retry'] >= ParameterForWebsocket::CHAT_HANDSHAKE_RETRY)
-                {
-                    // 強制切断
-                    throw new UnitException(
-                        UnitExceptionEnum::ECODE_HANDSHAKE_FAIL->message(),
-                        UnitExceptionEnum::ECODE_HANDSHAKE_FAIL->value,
-                        $p_param
-                    );
-                }
-
-                // リトライカウンター更新と受信バッファをクリア
-                $hdrs['buffer'] = '';
-                $p_param->setHeaders($hdrs);
-
-                $w_ret = $p_param->getHeaders();
-
-                return ProtocolForWebsocketStatusEnum::START->value;
-            }
-
-            return null;
         };
     }
 
@@ -451,16 +348,13 @@ class ProtocolForWebsocket implements IEntryUnits
             $w_ret = $p_param->protocol()->receiving();
             if($w_ret === null)
             {
-                if($p_param->getQueueName() !== ProtocolQueueEnum::ALIVE->value)
+                $cnt = $p_param->getRecvRetry() + 1;
+                if($cnt >= ParameterForWebsocket::CHAT_RECEIVE_EMPTY_RETRY)
                 {
-                    $cnt = $p_param->getRecvRetry() + 1;
-                    if($cnt >= ParameterForWebsocket::CHAT_RECEIVE_EMPTY_RETRY)
-                    {
-                        // アライブチェックの実行
-                        $p_param->aliveCheck(10);
-                    }
-                    $p_param->setRecvRetry($cnt);
+                    // アライブチェックの実行
+                    $p_param->aliveCheck(10);
                 }
+                $p_param->setRecvRetry($cnt);
                 return $sta;
             }
             $buf = $w_ret;
@@ -517,10 +411,10 @@ class ProtocolForWebsocket implements IEntryUnits
                     , 'close_code'   => null
                 ];
     
-                $sta = ProtocolForWebsocketStatusEnum::MASK->value;
+                $sta = ProtocolForWebsocketStatusEnum::PAYLOAD->value;
     
                 // 受信サイズを設定
-                $p_param->protocol()->setReceivingSize(4);
+                $p_param->protocol()->setReceivingSize($entry_data['length']);
             }
     
             // テンポラリバッファにセット
@@ -573,46 +467,6 @@ class ProtocolForWebsocket implements IEntryUnits
             $p_param->setTempBuff(['recv_buff' => $entry_data]);
     
             // 受信サイズを設定
-            $p_param->protocol()->setReceivingSize(4);
-
-            return ProtocolForWebsocketStatusEnum::MASK->value;
-        };
-    }
-
-    /**
-     * ステータス名： MASK
-     * 
-     * 処理名：マスクデータ受信
-     * 
-     * @param ParameterForWebsocket $p_param UNITパラメータ
-     * @return ?string 遷移先のステータス名
-     */
-    protected function getRecvMask()
-    {
-        return function(ParameterForWebsocket $p_param): ?string
-        {
-            // データ受信
-            $w_ret = $p_param->protocol()->receiving();
-            if($w_ret === null)
-            {
-                // 現在のステータス名を取得
-                $sta = $p_param->getStatusName();
-    
-                return $sta;
-            }
-            $buf = $w_ret;
-    
-            // 受信バッファからデータ取得
-            $entry_data = $p_param->getTempBuff(['recv_buff']);
-            $entry_data = $entry_data['recv_buff'];
-    
-            // マスクデータの格納
-            $entry_data['mask'] = $buf;
-    
-            // 受信バッファにセット
-            $p_param->setTempBuff(['recv_buff' => $entry_data]);
-    
-            // 受信サイズを設定
             $p_param->protocol()->setReceivingSize($entry_data['length']);
 
             return ProtocolForWebsocketStatusEnum::PAYLOAD->value;
@@ -646,11 +500,7 @@ class ProtocolForWebsocket implements IEntryUnits
             $entry_data = $p_param->getTempBuff(['recv_buff']);
     
             $entry_data = $entry_data['recv_buff'];
-            $entry_data['data'] = '';
-            for($i = 0; $i < strlen($buf); $i++)
-            {
-                $entry_data['data'] .= chr(ord($buf[$i]) ^ ord($entry_data['mask'][$i%4]));
-            }
+            $entry_data['data'] = $buf;
     
             // 切断フレームの場合は切断コードを取得する
             if(($entry_data['first_byte'] & 0x0f) === ParameterForWebsocket::CHAT_OPCODE_CLOSE_MASK)
@@ -719,8 +569,11 @@ class ProtocolForWebsocket implements IEntryUnits
             // 受信バッファからデータ取得
             $entry_data = $p_param->getTempBuff(['recv_buff']);
             $entry_data = $entry_data['recv_buff'];
-            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_PONG_MASK & 0x0f);  // maskなし
-            $length = strlen($entry_data['data']);
+            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_PONG_MASK & 0x0f);  // maskあり
+
+            $mask = random_bytes(4);
+            $payload = $this->maskPayload($entry_data['data'], $mask);
+            $length = strlen($payload);
     
             $header = '';
     
@@ -742,11 +595,12 @@ class ProtocolForWebsocket implements IEntryUnits
                 $header = pack('CCNN', $b1, ParameterForWebsocket::CHAT_PAYLOAD_LEN_CODE_8, $length);
             }
         
-            $p_param->protocol()->setSendingData($header.$entry_data['data']);
+            $p_param->protocol()->setSendingData($header.$mask.$payload);
 
             return ProtocolForWebsocketStatusEnum::PONG_SENDING->value;
         };
     }
+
 
     //--------------------------------------------------------------------------
     // 以降はステータスUNITの定義（"SEND"キュー）
@@ -772,7 +626,9 @@ class ProtocolForWebsocket implements IEntryUnits
             // ヘッダ部の構築
             //--------------------------------------------------------------------------
 
-            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_TEXT_MASK & 0x0f);  // maskなし
+            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_TEXT_MASK & 0x0f);  // maskあり
+            $mask = random_bytes(4);
+            $payload = $this->maskPayload($payload, $mask);
             $length = strlen($payload);
 
             $header = '';
@@ -795,8 +651,6 @@ class ProtocolForWebsocket implements IEntryUnits
                 $header = pack('CCNN', $b1, ParameterForWebsocket::CHAT_PAYLOAD_LEN_CODE_8, $length);
             }
         
-            $mask = '';
-        
             //--------------------------------------------------------------------------
             // 送信データの設定
             //--------------------------------------------------------------------------
@@ -804,32 +658,6 @@ class ProtocolForWebsocket implements IEntryUnits
             $p_param->protocol()->setSendingData($header.$mask.$payload);
 
             return ProtocolForWebsocketStatusEnum::SENDING->value;
-        };
-    }
-
-    /**
-     * ステータス名： SENDING
-     * 
-     * 処理名：送信実行
-     * 
-     * @param ParameterForWebsocket $p_param UNITパラメータ
-     * @return ?string 遷移先のステータス名
-     */
-    protected function getSendSending()
-    {
-        return function(ParameterForWebsocket $p_param): ?string
-        {
-            // データ送信
-            $w_ret = $p_param->protocol()->sending();
-    
-            // 送信中の場合は再実行
-            if($w_ret === null)
-            {
-                $sta = $p_param->getStatusName();
-                return $sta;
-            }
-
-            return null;
         };
     }
 
@@ -862,7 +690,9 @@ class ProtocolForWebsocket implements IEntryUnits
             // ヘッダ部の構築
             //--------------------------------------------------------------------------
     
-            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_CLOSE_MASK & 0x0f);  // maskなし
+            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_CLOSE_MASK & 0x0f);  // maskあり
+            $mask = random_bytes(4);
+            $payload = $this->maskPayload($payload, $mask);
             $length = strlen($payload);
     
             $header = '';
@@ -889,38 +719,9 @@ class ProtocolForWebsocket implements IEntryUnits
             // 送信データの設定
             //--------------------------------------------------------------------------
     
-            $p_param->protocol()->setSendingData($header.$payload);
+            $p_param->protocol()->setSendingData($header.$mask.$payload);
 
             return ProtocolForWebsocketStatusEnum::SENDING->value;
-        };
-    }
-
-    /**
-     * ステータス名： SENDING
-     * 
-     * 処理名：切断パケット送信実行
-     * 
-     * @param ParameterForWebsocket $p_param UNITパラメータ
-     * @return ?string 遷移先のステータス名
-     */
-    protected function getCloseSending()
-    {
-        return function(ParameterForWebsocket $p_param): ?string
-        {
-            // データ送信
-            $w_ret = $p_param->protocol()->sending();
-    
-            // 送信中の場合は再実行
-            if($w_ret === null)
-            {
-                $sta = $p_param->getStatusName();
-                return $sta;
-            }
-    
-            // 切断パラメータの取得
-            $close_param = $p_param->getCloseParameter();
-
-            return null;
         };
     }
 
@@ -951,7 +752,9 @@ class ProtocolForWebsocket implements IEntryUnits
             // ヘッダ部の構築
             //--------------------------------------------------------------------------
     
-            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_PING_MASK & 0x0f);  // maskなし
+            $b1 = ParameterForWebsocket::CHAT_FIN_BIT_MASK | (ParameterForWebsocket::CHAT_OPCODE_PING_MASK & 0x0f);  // maskあり
+            $mask = random_bytes(4);
+            $payload = $this->maskPayload($payload, $mask);
             $length = strlen($payload);
     
             $header = '';
@@ -978,36 +781,29 @@ class ProtocolForWebsocket implements IEntryUnits
             // 送信データの設定
             //--------------------------------------------------------------------------
     
-            $p_param->protocol()->setSendingData($header.$payload);
+            $p_param->protocol()->setSendingData($header.$mask.$payload);
     
             return ProtocolForWebsocketStatusEnum::SENDING->value;
         };
     }
 
     /**
-     * ステータス名： SENDING
+     * マスク済みペイロードの作成
      * 
-     * 処理名：PING送信実行
-     * 
-     * @param ParameterForWebsocket $p_param UNITパラメータ
-     * @return ?string 遷移先のステータス名
+     * @param string $p_payload ペイロードデータ
+     * @param string $p_mask_key マスクキー
+     * @return string マスク済みペイロードデータ
      */
-    protected function getAliveSending()
+    private function maskPayload(string $p_payload, string $p_mask_key): string
     {
-        return function(ParameterForWebsocket $p_param): ?string
-        {
-            // データ送信
-            $w_ret = $p_param->protocol()->sending();
-    
-            // 送信中の場合は再実行
-            if($w_ret === null)
-            {
-                $sta = $p_param->getStatusName();
-                return $sta;
-            }
-    
-            return ProtocolForWebsocketStatusEnum::RECV->value;
-        };
-    }
+        $len = strlen($p_payload);
+        $masked = '';
 
+        for($i = 0; $i < $len; $i++)
+        {
+            $masked .= $p_payload[$i] ^ $p_mask_key[$i % 4];
+        }
+
+        return $masked;
+    }
 }
