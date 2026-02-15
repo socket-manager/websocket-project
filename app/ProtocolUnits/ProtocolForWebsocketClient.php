@@ -348,13 +348,16 @@ class ProtocolForWebsocketClient extends ProtocolForWebsocket
             $w_ret = $p_param->protocol()->receiving();
             if($w_ret === null)
             {
-                $cnt = $p_param->getRecvRetry() + 1;
-                if($cnt >= ParameterForWebsocket::CHAT_RECEIVE_EMPTY_RETRY)
+                if($p_param->getQueueName() !== ProtocolQueueEnum::ALIVE->value)
                 {
-                    // アライブチェックの実行
-                    $p_param->aliveCheck(10);
+                    $cnt = $p_param->getRecvRetry() + 1;
+                    if($cnt >= ParameterForWebsocket::CHAT_RECEIVE_EMPTY_RETRY)
+                    {
+                        // アライブチェックの実行
+                        $p_param->aliveCheck(10);
+                    }
+                    $p_param->setRecvRetry($cnt);
                 }
-                $p_param->setRecvRetry($cnt);
                 return $sta;
             }
             $buf = $w_ret;
