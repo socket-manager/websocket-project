@@ -244,7 +244,20 @@ class ProtocolForWebsocket implements IEntryUnits
                     // ヘッダ情報を格納
                     $p_param->setHeaders($hdrs);
 
-                    return ProtocolForWebsocketStatusEnum::CREATE->value;
+                    $fnc = $this->getAcceptCreate();
+                    $sta = $fnc($p_param);
+                    if($sta === ProtocolForWebsocketStatusEnum::START->value)
+                    {
+                        // NG判定
+                        $hdrs = $p_param->getHeaders();
+                        if($hdrs['result'] === false)
+                        {
+                            return $sta;
+                        }
+                        return ProtocolForWebsocketStatusEnum::SEND->value;
+                    }
+
+                    return $sta;
                 }
     
                 // 受信中のデータを格納
@@ -345,7 +358,13 @@ class ProtocolForWebsocket implements IEntryUnits
             $hdrs['result'] = true;
             $p_param->setHeaders($hdrs);
 
-            return ProtocolForWebsocketStatusEnum::SEND->value;
+            $fnc = $this->getAcceptSend();
+            $sta = $fnc($p_param);
+            if($sta === ProtocolForWebsocketStatusEnum::CREATE->value)
+            {
+                return ProtocolForWebsocketStatusEnum::SEND->value;
+            }
+            return $sta;
         };
     }
 

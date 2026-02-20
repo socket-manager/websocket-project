@@ -189,10 +189,10 @@ class ProtocolForWebsocketClient extends ProtocolForWebsocket
     {
         return function(ParameterForWebsocket $p_param): ?string
         {
+            $host = $port = null;
+            $p_param->getRemoteAddr($host, $port);
+
             // ハンドシェイクデータの生成
-            $host = '';
-            $port = 0;
-            $p_param->getSockName($host, $port);
             $ver = ParameterForWebsocket::CHAT_PROTOCOL_VERSION;
             $key = base64_encode(random_bytes(16));
             $hdrs  =
@@ -205,8 +205,14 @@ class ProtocolForWebsocketClient extends ProtocolForWebsocket
 
             // 送信データの設定
             $p_param->protocol()->setSendingData($hdrs);
-    
-            return ProtocolForWebsocketStatusEnum::SEND->value;
+
+            $fnc = $this->getConnectSend();
+            $sta = $fnc($p_param);
+            if($sta === ProtocolForWebsocketStatusEnum::START->value)
+            {
+               return ProtocolForWebsocketStatusEnum::SEND->value; 
+            }
+            return ProtocolForWebsocketStatusEnum::RECV->value;
         };
     }
 
