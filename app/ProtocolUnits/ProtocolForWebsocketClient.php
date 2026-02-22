@@ -761,19 +761,19 @@ class ProtocolForWebsocketClient extends ProtocolForWebsocket
             // データ長１バイト
             if($length <= 125)
             {
-                $header = pack('CC', $b1, $length);
+                $header = pack('CC', $b1, $length | ~ParameterForWebsocket::CHAT_PAYLOAD_LEN_MASK);
             }
             // データ長２バイト
             else
             if($length > 125 && $length < 65536)
             {
-                $header = pack('CCn', $b1, ParameterForWebsocket::CHAT_PAYLOAD_LEN_CODE_2, $length);
+                $header = pack('CCn', $b1, ParameterForWebsocket::CHAT_PAYLOAD_LEN_CODE_2 | ~ParameterForWebsocket::CHAT_PAYLOAD_LEN_MASK, $length);
             }
             //データ長８バイト
             else
             if($length >= 65536)
             {
-                $header = pack('CCNN', $b1, ParameterForWebsocket::CHAT_PAYLOAD_LEN_CODE_8, $length);
+                $header = pack('CCNN', $b1, ParameterForWebsocket::CHAT_PAYLOAD_LEN_CODE_8 | ~ParameterForWebsocket::CHAT_PAYLOAD_LEN_MASK, $length);
             }
         
             //--------------------------------------------------------------------------

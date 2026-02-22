@@ -36,7 +36,7 @@ class MainForWebsocket extends Console
     /**
      * @var string コマンド処理の識別子
      */
-    protected string $identifer = 'app:websocket-server {port_no?}';
+    protected string $identifer = 'app:websocket-server {max_concurrent_connections?} {port?}';
 
     /**
      * @var string コマンド説明
@@ -46,7 +46,7 @@ class MainForWebsocket extends Console
     /**
      * @var string $host ホスト名（リッスン用）
      */
-    private string $host = 'localhost';
+    private string $host = '127.0.0.1';
 
     /**
      * @var int $port ポート番号（リッスン用）
@@ -56,7 +56,7 @@ class MainForWebsocket extends Console
     /**
      * @var int $cycle_interval 周期インターバル時間（μs）
      */
-    private int $cycle_interval = 1000;
+    private int $cycle_interval = 10;
 
     /**
      * @var int $alive_interval アライブチェックタイムアウト時間（s）
@@ -94,8 +94,11 @@ class MainForWebsocket extends Console
         // 引数の反映
         //--------------------------------------------------------------------------
 
-        // 引数の取得
-        $port = $this->getParameter('port_no');
+        // 接続制限数の取得
+        $max_concurrent_connections = $this->getParameter('max_concurrent_connections');
+
+        // ポート番号の取得
+        $port = $this->getParameter('port');
         if($port !== null)
         {
             $this->port = $port;
@@ -106,7 +109,7 @@ class MainForWebsocket extends Console
         //--------------------------------------------------------------------------
 
         // ソケットマネージャーのインスタンス設定
-        $manager = new SocketManager($this->host, $this->port);
+        $manager = new SocketManager($this->host, $this->port, null, $max_concurrent_connections);
 
         // UNITパラメータインスタンスの設定
         $param = new ParameterForWebsocket();
