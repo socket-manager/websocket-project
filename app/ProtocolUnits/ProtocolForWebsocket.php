@@ -707,6 +707,13 @@ class ProtocolForWebsocket implements IEntryUnits
             // データを受信バッファスタックに設定
             $p_param->setRecvStack($entry_data);
 
+            // 受信データが残っている場合はRECVキューへ移行
+            $chk = $p_param->protocol()->isExistReceivingBuffer();
+            if($chk)
+            {
+                $p_param->changeQueue(ProtocolQueueEnum::RECV->value);
+            }
+
             return null;
         };
     }
